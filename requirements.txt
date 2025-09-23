@@ -5,3 +5,4 @@ python-dotenv>=1.0.1
 tenacity>=8.2.3
 pydantic>=2.8.2
 openai>=1.40.0
+beautifulsoup4>=4.12.3
