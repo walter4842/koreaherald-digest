@@ -234,7 +234,7 @@ def read_env():
 def pick_entries(feeds: List[str], limit: int):
     import feedparser, time, httpx
     seen_links, entries = set(), []
-    alt_map = {"https://www.koreaherald.com/rss": ["https://m.koreaherald.com/rss"]}
+    alt_map = {"https://www.koreaherald.com/rss": ["https://www.koreaherald.com/rss/newsAll"]}
 
     # 입력 피드 + 보조 피드 병합
     to_fetch = []
