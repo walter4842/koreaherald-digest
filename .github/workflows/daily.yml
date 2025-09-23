@@ -8,22 +8,54 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run digest
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TZ: Asia/Seoul   # 파일명 날짜를 KST로 맞추기
         run: |
-          python digest.py --max-items 8 --out out
+          python digest.py --max-items 8 --out out --feeds "https://www.koreaherald.com/rss/newsAll"
+
+      - name: Set KST date
+        id: date
+        run: echo "today=$(TZ=Asia/Seoul date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Email digest & anki (SMTP)
+        # 성공 시에만 메일 발송 (실패시에도 보내려면 success() -> always())
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_HOST }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "Korea Herald Digest — ${{ steps.date.outputs.today }}"
+          to: ${{ secrets.TO_EMAIL }}
+          from: "KH Digest Bot <${{ secrets.SMTP_USERNAME }}>"
+          secure: true
+          body: |
+            Attached: Daily digest (MD) and Anki deck (CSV).
+            If MD preview looks plain on mobile, open in a markdown viewer.
+          attachments: |
+            out/${{ steps.date.outputs.today }}_digest.md
+            out/${{ steps.date.outputs.today }}_anki_vocab.csv
+
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: digest
           path: out/*
+          retention-days: 14
