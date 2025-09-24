@@ -17,6 +17,61 @@ import re
 
 from urllib.parse import quote_plus
 
+# --- Telegram message writer ---------------------------------
+def _is_simple_english_word(w: str) -> bool:
+    if not w:
+        return False
+    # 영문자/공백/하이픈/아포스트로피만 허용 (고유명사 필터는 LLM 단계에서 수행)
+    for ch in w:
+        if ch.isalpha() or ch in " -'":
+            continue
+        return False
+    return True
+
+def write_telegram_messages(outdir: str, date_ymd: str, digests: List[ArticleDigest], topn: int = 8):
+    """
+    메시지 포맷:
+      m/d
+
+      word1 뜻1
+      word2 뜻2
+      ...
+
+      기사 링크
+    """
+    ensure_dir(outdir)
+    tg_dir = os.path.join(outdir, "tg_msgs")
+    ensure_dir(tg_dir)
+
+    # 날짜 m/d
+    m = int(date_ymd[5:7]); d = int(date_ymd[8:10])
+    md_str = f"{m}/{d}"
+
+    created = []
+    for idx, dgt in enumerate(digests, start=1):
+        lines = []
+        count = 0
+        for v in dgt.vocab:
+            w = (v.word or "").strip()
+            mean = (v.meaning_ko or "").strip()
+            if not w or not mean:
+                continue
+            lines.append(f"{w} {mean}")  # ← 단어 다음에 뜻을 공백으로 연결
+            count += 1
+            if count >= topn:
+                break
+
+        vocab_block = "\n".join(lines) if lines else "(no vocab)"
+        text = f"{md_str}\n\n{vocab_block}\n\n{dgt.link}"
+
+        path = os.path.join(tg_dir, f"{date_ymd}_msg_{idx}.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        created.append(path)
+    return created
+
+
+
 
 def resolve_final_url(url: str, client) -> str:
     # Google News 중계 URL → 원문으로 리다이렉트 추적
@@ -471,6 +526,12 @@ def main():
     ymd = today_ymd(tz)
     md_path = write_markdown(outdir, ymd, digests)
     csv_path = write_anki_csv(outdir, ymd, digests)
+
+    # ✅ 텔레그램 메시지 파일 생성(기사별 1건)
+    tg_paths = write_telegram_messages(outdir, ymd, digests, topn=8)
+    print("Telegram message files:")
+    for p in tg_paths:
+        print(" -", p)
     print("Wrote:", md_path)
     print("Wrote:", csv_path)
 
