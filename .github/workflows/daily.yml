@@ -41,40 +41,34 @@ jobs:
         id: date
         run: echo "today=$(TZ=Asia/Seoul date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
-      - name: Telegram per-article messages
+      - name: Telegram per-article messages (multi chat_ids)
         if: success()
         env:
-            TG_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-            TG_CHAT:  ${{ secrets.TELEGRAM_CHAT_ID }}
+          TG_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TG_CHATS: ${{ secrets.TELEGRAM_CHAT_IDS }}
+        shell: bash
         run: |
+          if [ -z "$TG_CHATS" ]; then
+            echo "::warning::TELEGRAM_CHAT_IDS is empty; skipping Telegram step"
+            exit 0
+          fi
+
           shopt -s nullglob
-          for f in out/tg_msgs/${{ steps.date.outputs.today }}_msg_*.txt; do
-            echo "Sending $f"
-            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-              -d chat_id="${TG_CHAT}" \
-              --data-urlencode "text=$(cat "$f")"
+          IFS=',' read -ra CHATS <<< "$TG_CHATS"
+
+          for chat in "${CHATS[@]}"; do
+            chat="$(echo "$chat" | xargs)"   # trim spaces
+            echo "Sending to chat_id=$chat"
+            for f in out/tg_msgs/${{ steps.date.outputs.today }}_msg_*.txt; do
+              echo "  -> $f"
+              curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                -d chat_id="$chat" \
+                --data-urlencode "text=$(cat "$f")" \
+                >/dev/null
+              sleep 1   # 과도한 전송 속도 방지
+            done
             sleep 1
           done
-
-      - name: Email digest & anki (SMTP)
-        # 성공 시에만 메일 발송 (실패시에도 보내려면 success() -> always())
-        if: success()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: ${{ secrets.SMTP_HOST }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "Korea Herald Digest — ${{ steps.date.outputs.today }}"
-          to: ${{ secrets.TO_EMAIL }}
-          from: "KH Digest Bot <${{ secrets.SMTP_USERNAME }}>"
-          secure: true
-          body: |
-            Attached: Daily digest (MD) and Anki deck (CSV).
-            If MD preview looks plain on mobile, open in a markdown viewer.
-          attachments: |
-            out/${{ steps.date.outputs.today }}_digest.md
-            out/${{ steps.date.outputs.today }}_anki_vocab.csv
 
       - name: Upload artifacts
         if: always()
