@@ -364,7 +364,8 @@ def llm_analyze(title: str, text: str) -> ArticleDigest:
             "role": "user",
             "content": (
                 "Extract: 1) a Korean summary of 3-5 sentences capturing facts, names, numbers; "
-                "2) a vocabulary list of 10-15 EN words good for B1-C1 learners. "
+                "2) a vocabulary list of 10-15 English words suitable for upper-intermediate to advanced learners (focus on C1 level, include some C2 if relevant). "
+                "Avoid basic/common words and instead prioritize academic, abstract, or nuanced vocabulary. Do not include proper nouns or overly rare technical terms. "
                 "For each vocab item include fields: word, meaning_ko, pos, example_en, cefr(A1~C2). "
                 "Avoid proper nouns/rare technical terms. "
                 "Return JSON with keys: ko_summary (string), vocab (array). "
